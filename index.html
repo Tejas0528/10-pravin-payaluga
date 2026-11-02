@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>10 Pravin Payaluga</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#f5f2ff;--card:rgba(255,255,255,.82);--tx:#292341;--mu:#746d89;--pr:#e8590c;--bd:rgba(109,91,151,.17);--ok:#12805c;--wa:#b7791f;--er:#c53030}
+@media(prefers-color-scheme:dark){:root{--bg:#111322;--card:rgba(29,30,51,.88);--tx:#f0edff;--mu:#aaa6c1;--pr:#ff9862;--bd:rgba(191,177,235,.16);--ok:#4cc79a;--wa:#f0b429;--er:#ff7a7a}}
+*{box-sizing:border-box}
+body{min-height:100vh;margin:0;font:15px/1.5 system-ui,sans-serif;color:var(--tx);background-color:var(--bg);background-image:radial-gradient(ellipse at 12% 8%,rgba(255,190,126,.38),transparent 38%),radial-gradient(ellipse at 88% 18%,rgba(185,167,255,.36),transparent 40%),radial-gradient(ellipse at 70% 88%,rgba(122,221,222,.27),transparent 42%),linear-gradient(135deg,#fff9f1 0%,#f6f1ff 52%,#effaff 100%);background-size:140% 140%,145% 145%,150% 150%,100% 100%;background-attachment:fixed;animation:bg-drift 22s ease-in-out infinite alternate}
+@media(prefers-color-scheme:dark){body{background-image:radial-gradient(ellipse at 12% 8%,rgba(177,88,54,.24),transparent 38%),radial-gradient(ellipse at 88% 18%,rgba(105,79,177,.28),transparent 40%),radial-gradient(ellipse at 70% 88%,rgba(45,133,145,.2),transparent 42%),linear-gradient(135deg,#111322 0%,#171526 52%,#101b25 100%)}}
+@keyframes bg-drift{0%{background-position:0% 0%,100% 0%,100% 100%,0 0}100%{background-position:9% 12%,92% 8%,86% 92%,0 0}}
+*{scrollbar-color:var(--bd) transparent}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px max(16px,calc((100vw - 1100px)/2));background:var(--card);border-bottom:1px solid var(--bd);box-shadow:0 8px 30px rgba(48,35,83,.07);backdrop-filter:blur(16px);position:sticky;top:0;z-index:5}
+h1{font-size:21px;letter-spacing:-.04em;margin:0 12px 0 0;color:var(--pr)}nav{display:flex;gap:5px;flex-wrap:wrap}
+nav button{border:0;background:transparent;color:var(--mu);padding:8px 13px;border-radius:999px;cursor:pointer;font:inherit;font-weight:650;transition:background .2s ease,color .2s ease,transform .2s ease}
+nav button:hover{background:rgba(232,89,12,.1);color:var(--pr);transform:translateY(-1px)}
+nav button.on{background:linear-gradient(115deg,#f07635,#e34d76 60%,#a15be0);color:#fff;box-shadow:0 5px 14px rgba(218,83,94,.25)}
+main{max-width:1100px;margin:0 auto;padding:24px 16px 48px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:0 10px 30px rgba(48,35,83,.06);backdrop-filter:blur(12px);animation:card-in .45s both;transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
+.grid .card{margin:0}.grid .card:nth-child(2){animation-delay:.06s}.grid .card:nth-child(3){animation-delay:.12s}.grid .card:nth-child(4){animation-delay:.18s}
+.card:hover{transform:translateY(-2px);box-shadow:0 15px 34px rgba(48,35,83,.1);border-color:rgba(232,89,12,.24)}
+@keyframes card-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.k{color:var(--mu);font-size:13px;font-weight:550}.v{font-size:26px;font-weight:750;letter-spacing:-.04em}
+h2{font-size:17px;letter-spacing:-.02em;margin:0 0 14px}.row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+label{display:flex;flex-direction:column;font-size:12px;color:var(--mu);font-weight:600;gap:5px;flex:1;min-width:130px}
+input,select{font:inherit;padding:10px 11px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx);width:100%;transition:border-color .2s ease,box-shadow .2s ease}
+input:focus,select:focus{outline:none;border-color:var(--pr);box-shadow:0 0 0 3px rgba(232,89,12,.14)}
+.btn{border:0;background:linear-gradient(115deg,#f07635,#e34d76 60%,#a15be0);color:#fff;padding:10px 16px;border-radius:10px;font:inherit;font-weight:650;cursor:pointer;box-shadow:0 5px 13px rgba(218,83,94,.2);transition:transform .2s ease,filter .2s ease,box-shadow .2s ease}
+.btn:hover{transform:translateY(-2px);filter:saturate(1.12);box-shadow:0 8px 18px rgba(218,83,94,.28)}
+.btn:active{transform:translateY(0) scale(.98)}.btn.s{background:var(--bd);color:var(--tx);box-shadow:none}.btn.sm{padding:5px 10px;font-size:13px}.btn.d{background:var(--er);box-shadow:none}
+.tw{overflow-x:auto;border-radius:12px}table{border-collapse:collapse;width:100%;min-width:480px;background:rgba(255,255,255,.12)}
+th,td{padding:10px 12px;border-bottom:1px solid var(--bd);text-align:left;white-space:nowrap}th{color:var(--mu);font-size:11px;letter-spacing:.07em;text-transform:uppercase;background:rgba(125,105,173,.06)}
+tr:last-child td{border-bottom:0}tbody tr{transition:background .18s ease}tr:hover td{background:rgba(232,89,12,.045)}
+td.n,th.n{text-align:right}tr.t td{font-weight:700}
+.b{padding:4px 10px;border-radius:99px;font-size:12px;font-weight:700;color:#fff}.Paid{background:var(--ok)}.Partially{background:var(--wa)}.Pending{background:var(--er)}
+.off{opacity:.5}.pv{font-weight:700;color:var(--pr);padding:12px 0}.mu{color:var(--mu)}
+@media(max-width:600px){header{padding:10px 12px}h1{width:100%;margin:0 0 2px}main{padding:16px 12px 32px}.card{padding:15px;border-radius:15px}nav button{padding:7px 10px;font-size:13px}.v{font-size:23px}}
+.entry-card{max-width:560px;margin:0 auto 16px;padding:24px;background:#fffdfa;color:#30271e;border-color:#e8dfd1}
+.entry-fields{display:grid;gap:17px}
+.entry-fields label,.entry-field{min-width:0;gap:6px;color:#30271e;font-size:14px;font-weight:600}
+.entry-label{display:block}
+.entry-card input,.entry-card select{min-height:46px;padding:10px 14px;border:1px solid #e8dfd1;border-radius:13px;background:#fffdf9;color:#30271e;box-shadow:0 2px 5px rgba(58,43,23,.08)}
+.entry-card input:focus,.entry-card select:focus{border-color:#347e53;box-shadow:0 0 0 2px rgba(37,114,70,.14)}
+.meal-switch{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:5px;border-radius:16px;background:#f1ebdf}
+.meal-option{min-height:38px;border:0;border-radius:12px;background:transparent;color:#786b5d;font:inherit;font-weight:600;cursor:pointer;transition:background .2s ease,color .2s ease,box-shadow .2s ease}
+.meal-option[aria-pressed="true"]{background:#fffaf1;color:#30271e;box-shadow:0 2px 6px rgba(58,43,23,.12)}
+.entry-price-box{display:grid;gap:5px;margin-top:18px;padding:13px 17px;border-radius:15px;background:#f2ead5;color:#6b5b43}
+.entry-price-line{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.entry-price-line strong{color:#30271e;font-size:15px}
+.entry-price-line.total{font-weight:700;color:#30271e}
+.entry-price-line.total strong{font-size:17px}
+.entry-submit{width:100%;min-height:46px;margin-top:17px;background:#12643f;box-shadow:0 4px 9px rgba(18,100,63,.18)}
+.entry-submit:hover{background:#0d5735;box-shadow:0 7px 15px rgba(18,100,63,.24)}
+.entry-cancel{width:100%;margin-top:8px}
+.entry-message{display:block;margin-top:10px;text-align:center;color:#786b5d}
+@media(max-width:600px){.entry-card{padding:20px}.entry-fields{gap:16px}}
+.menu-add-card{border-color:rgba(232,89,12,.2)}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+</style></head><body>
+<header><h1>🍽 10 Pravin Payaluga</h1><nav id="nav"></nav></header><main id="app"></main>
+<script>
+const K='roombite_v2',MEALS=['Morning','Afternoon','Night'];
+const TABS=[['dash','Dashboard'],['entry','Food Entry'],['daily','Daily'],['month','Monthly & Payments'],['menu','Menu'],['mem','Members']];
+/* money: always integer paise */
+const P=s=>{s=String(s).trim();if(!/^\d+(\.\d{1,2})?$/.test(s))return null;const[a,b='']=s.split('.');return +a*100+ +(b+'00').slice(0,2)};
+const F=p=>'₹'+(p<0?'-':'')+(Math.abs(p)/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const R=p=>(Math.abs(p)/100).toFixed(2);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const todayStr=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const DEF=[['Idly','9.00'],['Dosa','17.60'],['Meals','65.00'],['Curry kozhambu','70.00'],['Ghee rice','45.00'],['Egg','8.00'],['Poori','15.00'],['Chapatti','18.30'],['Biriyani','90.00'],['Tomato rice','45.00'],['Pongal','40.00'],['Fried rice','70.00']];
+function fresh(){return{menu:DEF.map(([n,p],i)=>({id:'m'+(i+1),name:n,price:P(p),active:true})),members:[1,2,3,4,5,6].map(i=>({id:'p'+i,name:'Member '+i})),entries:[],paid:{}}}
+let S;
+function load(){try{const r=localStorage.getItem(K);S=r?JSON.parse(r):fresh()}catch(e){S=fresh()}}
+function save(){try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}}
+const ui={tab:'dash',date:todayStr(),member:null,meal:'Morning',item:null,qty:'',month:todayStr().slice(0,7),rm:null,edit:null,msg:''};
+const item=id=>S.menu.find(i=>i.id===id);
+const nameOf=e=>(item(e.item)||{}).name||e.name;
+const mname=id=>(S.members.find(m=>m.id===id)||{name:'?'}).name;
+const sum=a=>a.reduce((t,e)=>t+e.qty*e.price,0);
+const byMeal=a=>Object.fromEntries(MEALS.map(m=>[m,sum(a.filter(e=>e.meal===m))]));
+const mEntries=(m,mo)=>S.entries.filter(e=>e.member===m&&e.date.startsWith(mo)).sort((a,b)=>a.date.localeCompare(b.date)||MEALS.indexOf(a.meal)-MEALS.indexOf(b.meal));
+const bill=(m,mo)=>sum(mEntries(m,mo));
+const paid=(m,mo)=>S.paid[mo+'|'+m]||0;
+function status(m,mo){const b=bill(m,mo),p=paid(m,mo);return b===0&&p===0?'Pending':p>=b?'Paid':p>0?'Partially':'Pending'}
+const statLabel=s=>s==='Partially'?'Partially Paid':s;
+function itemQty(a){const o={};a.forEach(e=>{const n=nameOf(e);o[n]=(o[n]||0)+e.qty});return o}
+const monthLabel=mo=>new Date(mo+'-01T00:00').toLocaleString('en-IN',{month:'long',year:'numeric'});
+
+/* ---------- exports ---------- */
+function rowsFor(m,mo){ // detail rows with daily totals
+  const es=mEntries(m,mo),days=[...new Set(es.map(e=>e.date))],rows=[];
+  days.forEach(d=>{const de=es.filter(e=>e.date===d);
+    de.forEach(e=>rows.push({t:'i',date:d,meal:e.meal,name:nameOf(e),qty:e.qty,price:e.price,amt:e.qty*e.price}));
+    rows.push({t:'d',date:d,amt:sum(de)})});
+  return rows}
+function makePdf(m,mo){
+  const {jsPDF}=window.jspdf||globalThis.jspdf,doc=new jsPDF(),rows=rowsFor(m,mo);
+  doc.setFontSize(16);doc.text('10 Pravin Payaluga - Food Expense Statement',14,16);
+  doc.setFontSize(11);doc.text('Member: '+mname(m),14,24);doc.text('Month: '+monthLabel(mo),14,30);
+  const body=rows.map(r=>r.t==='i'?[r.date,r.meal,r.name,String(r.qty),'Rs. '+R(r.price),'Rs. '+R(r.amt)]:
+    [{content:'Daily total - '+r.date,colSpan:5,styles:{fontStyle:'bold',halign:'right',fillColor:[255,240,230]}},{content:'Rs. '+R(r.amt),styles:{fontStyle:'bold',fillColor:[255,240,230]}}]);
+  const b=bill(m,mo),p=paid(m,mo);
+  body.push([{content:'MONTHLY GRAND TOTAL',colSpan:5,styles:{fontStyle:'bold',halign:'right'}},{content:'Rs. '+R(b),styles:{fontStyle:'bold'}}]);
+  body.push([{content:'Amount paid',colSpan:5,styles:{halign:'right'}},'Rs. '+R(p)]);
+  body.push([{content:'Pending',colSpan:5,styles:{halign:'right'}},'Rs. '+R(Math.max(b-p,0))]);
+  doc.autoTable({startY:36,head:[['Date','Meal','Food item','Qty','Unit price','Amount']],body,headStyles:{fillColor:[232,89,12]},styles:{fontSize:9}});
+  return doc}
+function makeXlsx(m,mo){
+  const rows=rowsFor(m,mo),b=bill(m,mo),p=paid(m,mo);
+  const a=[['10 Pravin Payaluga - Food Expense Statement'],['Member',mname(m)],['Month',monthLabel(mo)],[],['Date','Meal','Food item','Quantity','Unit price (INR)','Amount (INR)']];
+  rows.forEach(r=>a.push(r.t==='i'?[r.date,r.meal,r.name,r.qty,r.price/100,r.amt/100]:['Daily total - '+r.date,'','','','',r.amt/100]));
+  a.push([],['Monthly grand total','','','','',b/100],['Amount paid','','','','',p/100],['Pending','','','','',Math.max(b-p,0)/100]);
+  const ws=XLSX.utils.aoa_to_sheet(a);ws['!cols']=[{wch:22},{wch:12},{wch:20},{wch:10},{wch:16},{wch:14}];
+  Object.keys(ws).forEach(k=>{if(k[0]!=='!'&&ws[k].t==='n'&&/^[EF]/.test(k))ws[k].z='"₹"#,##0.00'});
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Statement');return wb}
+const fname=(m,mo,x)=>'10_Pravin_Payaluga_'+mname(m).replace(/\W+/g,'_')+'_'+mo+'.'+x;
+
+/* ---------- views ---------- */
+const opts=(a,sel,fn)=>a.map(x=>`<option value="${x.id||x}" ${(x.id||x)===sel?'selected':''}>${esc(fn?fn(x):x.name||x)}</option>`).join('');
+const tbl=(h,r,n=[])=>`<div class="tw"><table><tr>${h.map((x,i)=>`<th class="${n.includes(i)?'n':''}">${x}</th>`).join('')}</tr>${r.join('')||`<tr><td colspan="${h.length}" class="mu">No records yet.</td></tr>`}</table></div>`;
+function vDash(){
+  const dflt=S.members.some(m=>/^Member \d$/.test(m.name));
+  const t=todayStr(),mo=t.slice(0,7),tot=sum(S.entries),td=sum(S.entries.filter(e=>e.date===t)),cm=sum(S.entries.filter(e=>e.date.startsWith(mo)));
+  const days=new Map();
+  S.entries.forEach((e,index)=>{const key=e.date+'|'+e.member;let day=days.get(key);
+    if(!day){day={date:e.date,member:e.member,entries:[],lastIndex:index};days.set(key,day)}
+    day.entries.push(e);day.lastIndex=index});
+  const rec=[...days.values()].sort((a,b)=>b.date.localeCompare(a.date)||b.lastIndex-a.lastIndex).slice(0,8);
+  return (dflt?`<div class="card" style="border-color:var(--pr)"><b>Set your room members' real names.</b> <button class="btn sm" data-t="mem">Rename members</button></div>`:'')+`<div class="grid"><div class="card"><div class="k">Total room expenses</div><div class="v">${F(tot)}</div></div>
+<div class="card"><div class="k">Today's food</div><div class="v">${F(td)}</div></div>
+<div class="card"><div class="k">${monthLabel(mo)} food expenses</div><div class="v">${F(cm)}</div></div></div>
+<div class="card"><h2>Member food totals – ${monthLabel(mo)}</h2>${tbl(['Member','Individual total'],S.members.map(m=>`<tr><td>${esc(m.name)}</td><td class="n">${F(bill(m.id,mo))}</td></tr>`).concat(`<tr class="t"><td>Total food expenses</td><td class="n">${F(cm)}</td></tr>`),[1])}</div>
+<div class="card"><h2>Recent daily expenses</h2>${tbl(['Date','Member','Meals','Food items','Day total'],rec.map(d=>{
+  const meals=[...new Set(d.entries.map(e=>e.meal))].sort((a,b)=>MEALS.indexOf(a)-MEALS.indexOf(b));
+  const items=new Map();d.entries.forEach(e=>{const n=nameOf(e);items.set(n,(items.get(n)||0)+e.qty)});
+  return`<tr><td>${d.date}</td><td>${esc(mname(d.member))}</td><td>${meals.map(esc).join(', ')}</td><td>${[...items].map(([n,q])=>`${esc(n)} × ${q}`).join(', ')}</td><td class="n">${F(sum(d.entries))}</td></tr>`}),[4])}</div>`}
+function vEntry(){
+  const act=S.menu.filter(i=>i.active);if(!ui.edit&&(!ui.item||!act.some(i=>i.id===ui.item)))ui.item=act[0]&&act[0].id;
+  const it=item(ui.item),q=parseInt(ui.qty)||0,ed=ui.edit&&S.entries.find(e=>e.id===ui.edit);
+  const unitPrice=ed&&ed.item===ui.item?ed.price:it&&it.price;
+  const list=S.entries.filter(e=>e.date===ui.date&&e.member===ui.member&&e.meal===ui.meal);
+  return `<div class="card entry-card"><h2>${ed?'Editing entry':'Add food entry'}</h2><div class="entry-fields">
+<label>Date<input class="entry-input" type="date" id="f-date" value="${ui.date}"></label>
+<label>Member<select class="entry-input" id="f-member">${opts(S.members,ui.member)}</select></label>
+<div class="entry-field"><span class="entry-label">Meal</span><div class="meal-switch" role="group" aria-label="Meal">${MEALS.map(meal=>`<button type="button" class="meal-option" data-meal="${meal}" aria-pressed="${ui.meal===meal}">${meal}</button>`).join('')}</div></div>
+<label>Food item<select class="entry-input" id="f-item">${opts(act,ed?ed.item:ui.item,i=>i.name+' – '+F(i.price))}</select></label>
+<label>Quantity<input class="entry-input" type="number" id="f-qty" min="1" step="1" placeholder="e.g. 2" value="${ed?ed.qty:ui.qty}"></label></div>
+<div class="entry-price-box"><div class="entry-price-line"><span>Unit price</span><strong id="unit-price">${unitPrice===undefined?'—':F(unitPrice)}</strong></div><div class="entry-price-line total"><span>Total</span><strong id="total-price">${unitPrice!==undefined&&q>0?F(unitPrice*q):'—'}</strong></div></div>
+<button class="btn entry-submit" data-a="${ed?'saveEdit':'add'}">${ed?'Save changes':'＋　Add entry'}</button>${ed?'<button class="btn s entry-cancel" data-a="cancelEdit">Cancel</button>':''}<span class="mu entry-message">${esc(ui.msg)}</span></div>
+<div class="card"><h2>${esc(mname(ui.member))} · ${ui.meal} · ${ui.date}</h2>${tbl(['Item','Qty','Unit price','Amount',''],list.map(e=>`<tr><td>${esc(nameOf(e))}</td><td>${e.qty}</td><td class="n">${F(e.price)}</td><td class="n">${F(e.qty*e.price)}</td><td><button class="btn s sm" data-a="edit" data-id="${e.id}">Edit</button> <button class="btn d sm" data-a="del" data-id="${e.id}">Remove</button></td></tr>`).concat(list.length?[`<tr class="t"><td colspan="3">${ui.meal} total</td><td class="n">${F(sum(list))}</td><td></td></tr>`]:[]),[2,3])}</div>`}
+function vDaily(){
+  const de=S.entries.filter(e=>e.date===ui.date),tm=byMeal(de);
+  const rows=S.members.map(m=>{const a=de.filter(e=>e.member===m.id),b=byMeal(a);return`<tr><td>${esc(m.name)}</td>${MEALS.map(x=>`<td class="n">${F(b[x])}</td>`).join('')}<td class="n"><b>${F(sum(a))}</b></td></tr>`});
+  rows.push(`<tr class="t"><td>Room total</td>${MEALS.map(x=>`<td class="n">${F(tm[x])}</td>`).join('')}<td class="n">${F(sum(de))}</td></tr>`);
+  return `<div class="card"><div class="row"><label style="max-width:220px">Date<input type="date" id="d-date" value="${ui.date}"></label></div></div>
+<div class="card"><h2>Daily totals</h2>${tbl(['Member',...MEALS,'Day total'],rows,[1,2,3,4])}</div>`}
+function vMonth(){
+  const mo=ui.month,m=ui.rm,es=mEntries(m,mo),q=itemQty(es),bm=byMeal(es),b=sum(es),p=paid(m,mo),s=status(m,mo);
+  const all=S.members.map(x=>{const bb=bill(x.id,mo),pp=paid(x.id,mo),ss=status(x.id,mo);return`<tr><td>${esc(x.name)}</td><td class="n">${F(bb)}</td><td class="n">${F(pp)}</td><td class="n">${F(Math.max(bb-pp,0))}</td><td><span class="b ${ss}">${statLabel(ss)}</span></td></tr>`});
+  return `<div class="card"><div class="row"><label>Month<input type="month" id="m-month" value="${mo}"></label><label>Member<select id="m-mem">${opts(S.members,m)}</select></label>
+<button class="btn" data-a="pdf">⬇ PDF</button><button class="btn" data-a="xlsx">⬇ Excel</button></div></div>
+<div class="card"><h2>${esc(mname(m))} – ${monthLabel(mo)}</h2>
+<div class="grid">${MEALS.map(x=>`<div><div class="k">${x} total</div><div class="v">${F(bm[x])}</div></div>`).join('')}<div><div class="k">Monthly grand total</div><div class="v" style="color:var(--pr)">${F(b)}</div></div></div>
+${tbl(['Food item','Total quantity'],S.menu.map(i=>i.name).concat(Object.keys(q).filter(n=>!S.menu.some(i=>i.name===n))).filter((n,i,a)=>a.indexOf(n)===i).map(n=>`<tr class="${q[n]?'':'mu'}"><td>${esc(n)}</td><td>${q[n]||0}</td></tr>`),[])}</div>
+<div class="card"><h2>Payment – ${esc(mname(m))}</h2><div class="row"><div><div class="k">Bill</div><b>${F(b)}</b></div><label style="max-width:200px">Amount paid (₹)<input id="m-paid" value="${R(p)}"></label>
+<button class="btn" data-a="savePaid">Save payment</button><div><div class="k">Pending</div><b>${F(Math.max(b-p,0))}</b></div><span class="b ${s}">${statLabel(s)}</span></div><div class="mu">${esc(ui.msg)}</div></div>
+<div class="card"><h2>All members</h2>${tbl(['Member','Bill','Paid','Pending','Status'],all,[1,2,3])}</div>`}
+function vMenu(){
+  return `<div class="card menu-add-card"><h2>Add a new menu item &amp; rate</h2><div class="row"><label>Food name<input id="n-name"></label><label>Price (₹)<input id="n-price" inputmode="decimal" placeholder="e.g. 17.60"></label><button class="btn" data-a="addItem">＋ Add to menu</button></div><div class="mu">${esc(ui.msg)}${ui.msg?' · ':''}New items appear in the Food item list on the Food Entry tab.</div></div>
+<div class="card"><h2>Menu</h2><p class="mu">Changing a price affects only future entries. Past entries keep their original unit price.</p>${tbl(['Item','Price (₹)','Status',''],S.menu.map(i=>`<tr class="${i.active?'':'off'}"><td><input data-f="name" data-id="${i.id}" value="${esc(i.name)}"></td><td><input data-f="price" data-id="${i.id}" value="${R(i.price)}" style="width:100px"></td><td>${i.active?'Active':'Inactive'}</td><td><button class="btn s sm" data-a="toggle" data-id="${i.id}">${i.active?'Deactivate':'Activate'}</button> <button class="btn d sm" data-a="delItem" data-id="${i.id}">Delete</button></td></tr>`),[])}</div>`}
+function vMem(){return `<div class="card"><h2>Member profiles</h2><p class="mu">Type each person's real name; it saves automatically and updates all reports.</p><div class="row">${S.members.map(m=>`<label>Member<input data-f="mname" data-id="${m.id}" value="${esc(m.name)}"></label>`).join('')}</div></div>`}
+
+function render(){
+  document.getElementById('nav').innerHTML=TABS.map(([k,l])=>`<button class="${ui.tab===k?'on':''}" data-t="${k}">${l}</button>`).join('');
+  const v={dash:vDash,entry:vEntry,daily:vDaily,month:vMonth,menu:vMenu,mem:vMem}[ui.tab];
+  document.getElementById('app').innerHTML=v()}
+function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
+function say(t){ui.msg=t;render()}
+function act(a,id){
+  if(a==='add'||a==='saveEdit'){
+    const qty=parseInt(ui.qty);if(!(qty>0))return say('Enter a quantity of 1 or more.');
+    if(a==='add'){const it=item(ui.item);if(!it)return say('Select a food item.');
+      S.entries.push({id:uid(),date:ui.date,member:ui.member,meal:ui.meal,item:it.id,name:it.name,qty,price:it.price});ui.qty='';ui.msg='Added ✓'}
+    else{const e=S.entries.find(x=>x.id===ui.edit);const it=item(ui.item);
+      if(it&&it.id!==e.item){e.item=it.id;e.name=it.name;e.price=it.price}
+      e.qty=qty;e.date=ui.date;e.member=ui.member;e.meal=ui.meal;ui.edit=null;ui.qty='';ui.msg='Updated ✓'}
+    save();render()}
+  else if(a==='edit'){const e=S.entries.find(x=>x.id===id);Object.assign(ui,{edit:id,date:e.date,member:e.member,meal:e.meal,item:e.item,qty:String(e.qty),msg:''});render()}
+  else if(a==='cancelEdit'){ui.edit=null;ui.qty='';render()}
+  else if(a==='del'){if(confirm('Remove this entry?')){S.entries=S.entries.filter(e=>e.id!==id);save();render()}}
+  else if(a==='pdf'){makePdf(ui.rm,ui.month).save(fname(ui.rm,ui.month,'pdf'))}
+  else if(a==='xlsx'){XLSX.writeFile(makeXlsx(ui.rm,ui.month),fname(ui.rm,ui.month,'xlsx'))}
+  else if(a==='savePaid'){const v=P(document.getElementById('m-paid').value);if(v===null)return say('Enter a valid amount (max 2 decimals).');S.paid[ui.month+'|'+ui.rm]=v;save();ui.msg='Saved ✓';render()}
+  else if(a==='addItem'){const n=document.getElementById('n-name').value.trim(),p=P(document.getElementById('n-price').value);
+    if(!n||p===null)return say('Enter a name and a valid price.');const id=uid();S.menu.push({id,name:n,price:p,active:true});ui.item=id;save();ui.msg='Item added ✓';render()}
+  else if(a==='toggle'){const i=item(id);i.active=!i.active;save();render()}
+  else if(a==='delItem'){const i=item(id),used=S.entries.some(e=>e.item===id);
+    if(used){if(confirm('This item has past entries. It will be deactivated (history is kept).')){i.active=false;save();render()}}
+    else if(confirm('Delete '+i.name+'?')){S.menu=S.menu.filter(x=>x.id!==id);save();render()}}}
+function init(){
+  load();ui.member=ui.rm=S.members[0].id;render();
+  document.addEventListener('click',e=>{const meal=e.target.closest('[data-meal]');if(meal){ui.meal=meal.dataset.meal;render();return}
+    const t=e.target.closest('[data-t]');if(t){ui.tab=t.dataset.t;ui.msg='';render();return}
+    const b=e.target.closest('[data-a]');if(b)act(b.dataset.a,b.dataset.id)});
+  document.addEventListener('change',e=>{const el=e.target,id=el.id,f=el.dataset.f;
+    if(id==='f-date'){ui.date=el.value;render()}else if(id==='f-member'){ui.member=el.value;render()}else if(id==='f-meal'){ui.meal=el.value;render()}
+    else if(id==='f-item'){ui.item=el.value;render()}else if(id==='d-date'){ui.date=el.value||todayStr();render()}
+    else if(id==='m-month'){ui.month=el.value||ui.month;ui.msg='';render()}else if(id==='m-mem'){ui.rm=el.value;ui.msg='';render()}
+    else if(f==='name'&&el.value.trim()){item(el.dataset.id).name=el.value.trim();save();render()}
+    else if(f==='price'){const p=P(el.value),i=item(el.dataset.id);if(p!==null){i.price=p;save()}render()}
+    else if(f==='mname'&&el.value.trim()){S.members.find(m=>m.id===el.dataset.id).name=el.value.trim();save()}});
+  document.addEventListener('input',e=>{if(e.target.id==='f-qty'){ui.qty=e.target.value;const it=item(ui.item),ed=ui.edit&&S.entries.find(x=>x.id===ui.edit),q=parseInt(ui.qty)||0,unitPrice=ed&&ed.item===ui.item?ed.price:it&&it.price;
+    document.getElementById('unit-price').textContent=unitPrice===undefined?'—':F(unitPrice);
+    document.getElementById('total-price').textContent=unitPrice!==undefined&&q>0?F(unitPrice*q):'—'}})}
+if(typeof document!=='undefined')init();
+</script></body></html>
