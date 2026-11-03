@@ -1168,7 +1168,6 @@ async function handleChange(event) {
   try {
     if (element.id === 'entry-date') {
       state.date = element.value;
-      render();
     } else if (element.id === 'entry-member') {
       state.memberId = element.value;
       render();
@@ -1177,7 +1176,6 @@ async function handleChange(event) {
       updateQuantityPreview();
     } else if (element.id === 'daily-date') {
       state.date = element.value || today();
-      render();
     } else if (element.id === 'report-month') {
       if (element.value) state.month = element.value;
       render();
@@ -1290,6 +1288,14 @@ async function initialize() {
       console.error(error);
       showNotice(databaseError(error), 'error');
     });
+  });
+  $('#app').addEventListener('focusout', event => {
+    const element = event.target;
+    if (element.id !== 'entry-date' && element.id !== 'daily-date') return;
+    state.date = element.value || (element.id === 'daily-date' ? today() : '');
+    window.setTimeout(() => {
+      if (!state.busy) render();
+    }, 0);
   });
   supabase.auth.onAuthStateChange((event, session) => {
     if (event === 'PASSWORD_RECOVERY') {
