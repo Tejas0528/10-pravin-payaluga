@@ -77,6 +77,7 @@ const selectedMember = id => state.members.find(member => member.id === id);
 const selectedMenuItem = id => state.menu.find(item => item.id === id);
 const memberName = id => selectedMember(id)?.name || 'Unknown member';
 const menuName = id => selectedMenuItem(id)?.name || 'Removed menu item';
+const entryItemName = entry => entry.itemName || menuName(entry.menuItemId);
 const monthPayments = (memberId, month) => state.payments.filter(payment =>
   payment.memberId === memberId && payment.billingMonth.startsWith(month)
 );
@@ -123,7 +124,7 @@ async function loadData() {
     supabase.from('members').select('id,name').order('name'),
     supabase.from('menu_items').select('id,name,price_paise,is_active').order('name'),
     supabase.from('food_entries').select('id,member_id,entry_date,meal').order('entry_date', { ascending: false }),
-    supabase.from('food_entry_items').select('id,entry_id,menu_item_id,quantity,unit_price_paise'),
+    supabase.from('food_entry_items').select('id,entry_id,item_name,menu_item_id,quantity,unit_price_paise'),
     supabase.from('payments').select('id,member_id,billing_month,amount_paid_paise,payment_date')
   ];
   if (state.isOwner) {
@@ -156,6 +157,7 @@ async function loadData() {
       memberId: parent.member_id,
       date: parent.entry_date,
       meal: parent.meal,
+      itemName: item.item_name,
       menuItemId: item.menu_item_id,
       quantity: Number(item.quantity),
       pricePaise: Number(item.unit_price_paise)
@@ -228,7 +230,7 @@ function renderDashboard() {
         .sort((a, b) => MEALS.indexOf(a) - MEALS.indexOf(b));
       const foods = new Map();
       group.entries.forEach(entry => {
-        const name = menuName(entry.menuItemId);
+        const name = entryItemName(entry);
         foods.set(name, (foods.get(name) || 0) + entry.quantity);
       });
       return `<tr><td>${escapeHtml(group.date)}</td><td>${meals.map(escapeHtml).join(', ')}</td><td>${[...foods].map(([name, quantity]) => `${escapeHtml(name)} × ${quantity}`).join(', ')}</td><td class="n">${formatMoney(sum(group.entries))}</td></tr>`;
@@ -248,7 +250,7 @@ function renderDashboard() {
       .sort((a, b) => MEALS.indexOf(a) - MEALS.indexOf(b));
     const foods = new Map();
     group.entries.forEach(entry => {
-      const name = menuName(entry.menuItemId);
+      const name = entryItemName(entry);
       foods.set(name, (foods.get(name) || 0) + entry.quantity);
     });
     return `<tr><td>${escapeHtml(group.date)}</td><td>${escapeHtml(memberName(group.memberId))}</td><td>${meals.map(escapeHtml).join(', ')}</td><td>${[...foods].map(([name, quantity]) => `${escapeHtml(name)} × ${quantity}`).join(', ')}</td><td class="n">${formatMoney(sum(group.entries))}</td></tr>`;
@@ -284,7 +286,7 @@ function renderEntry() {
     `<option value="${escapeHtml(item.id)}" ${item.id === state.menuItemId ? 'selected' : ''}>${escapeHtml(item.name)} – ${formatMoney(item.pricePaise)}</option>`
   ).join('');
   const currentRows = currentEntries.map(entry =>
-    `<tr><td>${escapeHtml(menuName(entry.menuItemId))}</td><td>${entry.quantity}</td><td class="n">${formatMoney(entry.pricePaise)}</td><td class="n">${formatMoney(entry.pricePaise * entry.quantity)}</td><td><button class="btn s sm" data-action="edit-entry" data-id="${escapeHtml(entry.id)}">Edit</button> <button class="btn d sm" data-action="delete-entry" data-id="${escapeHtml(entry.id)}">Remove</button></td></tr>`
+    `<tr><td>${escapeHtml(entryItemName(entry))}</td><td>${entry.quantity}</td><td class="n">${formatMoney(entry.pricePaise)}</td><td class="n">${formatMoney(entry.pricePaise * entry.quantity)}</td><td><button class="btn s sm" data-action="edit-entry" data-id="${escapeHtml(entry.id)}">Edit</button> <button class="btn d sm" data-action="delete-entry" data-id="${escapeHtml(entry.id)}">Remove</button></td></tr>`
   );
   if (currentEntries.length) {
     currentRows.push(`<tr class="t"><td colspan="3">${escapeHtml(state.meal)} total</td><td class="n">${formatMoney(sum(currentEntries))}</td><td></td></tr>`);
@@ -319,7 +321,7 @@ function renderDaily() {
     mealRows.push(`<tr class="t"><td>Your day total</td><td class="n">${formatMoney(sum(ownEntries))}</td></tr>`);
     return `<div class="card"><div class="row"><label style="max-width:220px">Date<input id="daily-date" type="date" value="${escapeHtml(state.date)}"></label></div></div>
       <div class="card"><h2>${escapeHtml(member.name)}’s orders · ${escapeHtml(state.date)}</h2>${table(['Meal', 'Your total'], mealRows, [1])}
-      ${table(['Food item', 'Meal', 'Qty', 'Amount'], ownEntries.map(entry => `<tr><td>${escapeHtml(menuName(entry.menuItemId))}</td><td>${escapeHtml(entry.meal)}</td><td>${entry.quantity}</td><td class="n">${formatMoney(entry.pricePaise * entry.quantity)}</td></tr>`), [3])}</div>`;
+      ${table(['Food item', 'Meal', 'Qty', 'Amount'], ownEntries.map(entry => `<tr><td>${escapeHtml(entryItemName(entry))}</td><td>${escapeHtml(entry.meal)}</td><td>${entry.quantity}</td><td class="n">${formatMoney(entry.pricePaise * entry.quantity)}</td></tr>`), [3])}</div>`;
   }
   const rows = state.members.map(member => {
     const personEntries = entries.filter(entry => entry.memberId === member.id);
@@ -341,7 +343,11 @@ function renderMonth() {
   const entries = memberEntries(memberId, state.month);
   const meals = MEALS.map(meal => `<div><div class="k">${meal} total</div><div class="v">${formatMoney(sum(entries.filter(entry => entry.meal === meal)))}</div></div>`).join('');
   const quantities = new Map();
-  entries.forEach(entry => quantities.set(entry.menuItemId, (quantities.get(entry.menuItemId) || 0) + entry.quantity));
+  const itemNames = new Map();
+  entries.forEach(entry => {
+    quantities.set(entry.menuItemId, (quantities.get(entry.menuItemId) || 0) + entry.quantity);
+    itemNames.set(entry.menuItemId, entryItemName(entry));
+  });
   const itemIds = state.isOwner
     ? [...new Set([...state.menu.map(item => item.id), ...quantities.keys()])]
     : [...quantities.keys()];
@@ -360,7 +366,7 @@ function renderMonth() {
     </div></div>
     <div class="card"><h2>${escapeHtml(memberName(memberId))} – ${escapeHtml(monthLabel(state.month))}</h2>
       <div class="grid">${meals}<div><div class="k">Monthly grand total</div><div class="v">${formatMoney(sum(entries))}</div></div></div>
-      ${table(['Food item', 'Total quantity'], itemIds.map(id => `<tr class="${quantities.has(id) ? '' : 'mu'}"><td>${escapeHtml(menuName(id))}</td><td>${quantities.get(id) || 0}</td></tr>`))}
+      ${table(['Food item', 'Total quantity'], itemIds.map(id => `<tr class="${quantities.has(id) ? '' : 'mu'}"><td>${escapeHtml(itemNames.get(id) || menuName(id))}</td><td>${quantities.get(id) || 0}</td></tr>`))}
     </div>
     ${state.isOwner ? `<div class="card"><h2>Payments – ${escapeHtml(memberName(memberId))}</h2>
       <div class="row"><div><div class="k">Bill</div><b>${formatMoney(sum(entries))}</b></div><label style="max-width:190px">Amount (₹)<input id="payment-amount" type="number" min="0.01" step="0.01" placeholder="e.g. 100"></label><label style="max-width:190px">Payment date<input id="payment-date" type="date" value="${today()}"></label><button class="btn" data-action="add-payment">Add payment</button><div><div class="k">Paid</div><b>${formatMoney(paidAmount(memberId, state.month))}</b></div><div><div class="k">Pending</div><b>${formatMoney(Math.max(sum(entries) - paidAmount(memberId, state.month), 0))}</b></div></div>
@@ -733,7 +739,6 @@ async function createEntry() {
   const menuItem = selectedMenuItem(state.menuItemId);
   if (!menuItem || !menuItem.active) throw new Error('Select an active menu item.');
   let entryId;
-  let createdParent = false;
   const existingResult = await supabase.from('food_entries')
     .select('id')
     .eq('member_id', state.memberId)
@@ -751,24 +756,38 @@ async function createEntry() {
       meal: state.meal
     }).select('id').single();
     entryId = requireResult(parentResult, 'Creating the food entry').id;
-    createdParent = true;
   }
-  const itemBeingEdited = state.entries.find(entry => entry.id === state.editItemId);
-  const pricePaise = itemBeingEdited?.menuItemId === menuItem.id
-    ? itemBeingEdited.pricePaise : menuItem.pricePaise;
+  const findMatchingItem = () => supabase.from('food_entry_items').select('id')
+    .eq('entry_id', entryId)
+    .eq('item_name', menuItem.name)
+    .eq('menu_item_id', menuItem.id)
+    .eq('quantity', quantity)
+    .eq('unit_price_paise', menuItem.pricePaise)
+    .limit(1)
+    .maybeSingle();
+  const existingItemResult = await findMatchingItem();
+  const existingItem = requireResult(existingItemResult, 'Checking for an existing food item');
+  if (existingItem) {
+    state.quantity = '';
+    return 'This identical food item is already recorded; no duplicate was added.';
+  }
   const itemResult = await supabase.from('food_entry_items').insert({
     entry_id: entryId,
+    item_name: menuItem.name,
     menu_item_id: menuItem.id,
     quantity,
-    unit_price_paise: pricePaise
+    unit_price_paise: menuItem.pricePaise
   });
   if (itemResult.error) {
-    let cleanupError = '';
-    if (createdParent) {
-      const cleanup = await supabase.from('food_entries').delete().eq('id', entryId);
-      if (cleanup.error) cleanupError = ` The empty entry could not be removed: ${cleanup.error.message}`;
+    const verificationResult = await findMatchingItem();
+    if (verificationResult.error) {
+      throw new Error(`Adding the food item: ${itemResult.error.message}. Could not verify whether it was saved: ${verificationResult.error.message}`);
     }
-    throw new Error(`Adding the food item: ${itemResult.error.message}.${cleanupError}`);
+    if (verificationResult.data) {
+      state.quantity = '';
+      return 'Food item was saved despite a network response issue; no duplicate was added.';
+    }
+    throw new Error(`Adding the food item: ${itemResult.error.message}`);
   }
   state.quantity = '';
 }
@@ -814,6 +833,7 @@ async function saveEntry() {
     ? current.pricePaise : menuItem.pricePaise;
   const updateResult = await supabase.from('food_entry_items').update({
     entry_id: targetParent,
+    item_name: menuItem.id === current.menuItemId ? entryItemName(current) : menuItem.name,
     menu_item_id: menuItem.id,
     quantity,
     unit_price_paise: pricePaise
@@ -989,7 +1009,7 @@ function rowsForReport(memberId, month) {
   const appendDay = () => {
     if (!dateEntries.length) return;
     dateEntries.forEach(entry => rows.push([
-      currentDate, entry.meal, menuName(entry.menuItemId), entry.quantity,
+      currentDate, entry.meal, entryItemName(entry), entry.quantity,
       Number(formatRupees(entry.pricePaise)), Number(formatRupees(entry.pricePaise * entry.quantity))
     ]));
     rows.push([`Daily total - ${currentDate}`, '', '', '', '', Number(formatRupees(sum(dateEntries)))]);
@@ -1092,7 +1112,7 @@ async function perform(action, id, memberId) {
   render();
   try {
     let notice = '';
-    if (action === 'add-entry') await createEntry();
+    if (action === 'add-entry') notice = await createEntry() || '';
     else if (action === 'save-entry') await saveEntry();
     else if (action === 'delete-entry') {
       if (!window.confirm('Remove this food item?')) return;
@@ -1130,7 +1150,7 @@ async function perform(action, id, memberId) {
     }
     await loadData();
     state.notice = notice || ({
-      'add-entry': 'Food entry added.',
+      'add-entry': 'Food entry added successfully.',
       'save-entry': 'Food entry updated.',
       'delete-entry': 'Food item removed.',
       'add-menu': 'Menu item added.',
