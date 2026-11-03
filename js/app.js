@@ -22,6 +22,7 @@ const state = {
   accessStatus: 'signed-out',
   accessRequest: null,
   accessRequests: [],
+  approvalMemberIds: {},
   tab: 'dash',
   date: today(),
   month: today().slice(0, 7),
@@ -104,7 +105,8 @@ function requireResult(result, operation) {
 
 function databaseError(error) {
   const message = error?.message || 'An unexpected error occurred.';
-  if (error?.code === 'PGRST205' || /member_access_requests/i.test(message)) {
+  if (error?.showSupabaseMessage) return message;
+  if (error?.code === 'PGRST205') {
     return 'Access approval is not set up yet. The owner must run supabase/security.sql in the Supabase SQL Editor before anyone uses the app.';
   }
   if (error?.code === '42501' || /row-level security|permission denied/i.test(message)) {
@@ -402,10 +404,11 @@ function renderAccessRequests() {
     .map(request => request.member_id));
   const rows = reviewable.map(request => {
     const availableMembers = state.members.filter(member => !approvedByOthers.has(member.id));
+    const selectedMemberId = state.approvalMemberIds[request.user_id] || '';
     const options = availableMembers.map(member =>
-      `<option value="${escapeHtml(member.id)}">${escapeHtml(member.name)}</option>`
+      `<option value="${escapeHtml(member.id)}" ${member.id === selectedMemberId ? 'selected' : ''}>${escapeHtml(member.name)}</option>`
     ).join('');
-    return `<tr><td>${escapeHtml(request.email)} <span class="b ${request.status === 'rejected' ? 'Pending' : 'Partially'}">${escapeHtml(request.status)}</span></td><td><select aria-label="Assign member for ${escapeHtml(request.email)}" data-approval-member="${escapeHtml(request.user_id)}"><option value="">Select a member</option>${options}</select></td><td><button class="btn sm" data-action="approve-request" data-id="${escapeHtml(request.user_id)}" ${availableMembers.length ? '' : 'disabled'}>Approve</button> <button class="btn d sm" data-action="reject-request" data-id="${escapeHtml(request.user_id)}">Reject</button></td></tr>`;
+    return `<tr><td>${escapeHtml(request.email)} <span class="b ${request.status === 'rejected' ? 'Pending' : 'Partially'}">${escapeHtml(request.status)}</span></td><td><select aria-label="Assign member for ${escapeHtml(request.email)}" data-approval-member="${escapeHtml(request.user_id)}"><option value="" ${selectedMemberId ? '' : 'selected'}>Select a member</option>${options}</select></td><td><button class="btn sm" data-action="approve-request" data-id="${escapeHtml(request.user_id)}" data-member-id="${escapeHtml(selectedMemberId)}" ${availableMembers.length ? '' : 'disabled'}>Approve</button> <button class="btn d sm" data-action="reject-request" data-id="${escapeHtml(request.user_id)}">Reject</button></td></tr>`;
   });
   const allRows = state.accessRequests.map(request =>
     `<tr><td>${escapeHtml(request.email)}</td><td>${request.status === 'approved' ? escapeHtml(memberName(request.member_id)) : '—'}</td><td>${escapeHtml(request.status)}</td></tr>`
@@ -609,6 +612,7 @@ async function showApp(user) {
     state.accessStatus = 'signed-out';
     state.accessRequest = null;
     state.accessRequests = [];
+    state.approvalMemberIds = {};
     state.passwordMessage = '';
     state.passwordError = false;
     $('#auth-screen').hidden = false;
@@ -944,15 +948,12 @@ async function deletePayment(id) {
   requireResult(result, 'Removing the payment');
 }
 
-async function updateAccessRequest(userId, decision) {
+async function updateAccessRequest(userId, decision, memberId) {
   if (!state.isOwner) throw new Error('Only the owner can review access requests.');
   const request = state.accessRequests.find(item => item.user_id === userId);
   if (!request || request.status === 'approved') {
     throw new Error('This request has already been approved. Refresh the request list.');
   }
-  const memberSelect = [...document.querySelectorAll('[data-approval-member]')]
-    .find(input => input.dataset.approvalMember === userId);
-  const memberId = memberSelect?.value;
   if (decision === 'approved') {
     if (!memberId || !state.members.some(member => member.id === memberId)) {
       throw new Error('Choose one of the existing members before approving this account.');
@@ -967,9 +968,15 @@ async function updateAccessRequest(userId, decision) {
     status: decision,
     member_id: decision === 'approved' ? memberId : null
   }).eq('user_id', userId).eq('status', request.status).select('user_id').maybeSingle();
-  if (!requireResult(result, `Marking the request ${decision}`)) {
+  if (result.error) {
+    const error = new Error(result.error.message);
+    error.showSupabaseMessage = true;
+    throw error;
+  }
+  if (!result.data) {
     throw new Error('The request changed before your decision was saved. Refresh the request list.');
   }
+  delete state.approvalMemberIds[userId];
 }
 
 function rowsForReport(memberId, month) {
@@ -1056,7 +1063,7 @@ function downloadReport(format) {
   window.XLSX.writeFile(workbook, `${filename}.xlsx`);
 }
 
-async function perform(action, id) {
+async function perform(action, id, memberId) {
   if (state.busy) return;
   const ownerActions = new Set([
     'add-entry', 'save-entry', 'delete-entry', 'edit-entry', 'add-menu',
@@ -1110,7 +1117,7 @@ async function perform(action, id) {
       if (!window.confirm('Remove this payment?')) return;
       await deletePayment(id);
     } else if (action === 'approve-request') {
-      await updateAccessRequest(id, 'approved');
+      await updateAccessRequest(id, 'approved', memberId);
     } else if (action === 'reject-request') {
       if (!window.confirm('Reject this signup request?')) return;
       await updateAccessRequest(id, 'rejected');
@@ -1176,6 +1183,9 @@ async function handleChange(event) {
       render();
     } else if (element.id === 'report-member') {
       state.reportMemberId = element.value;
+      render();
+    } else if (element.dataset.approvalMember) {
+      state.approvalMemberIds[element.dataset.approvalMember] = element.value;
       render();
     } else if (element.dataset.menuName || element.dataset.menuPrice) {
       await saveMenuField(element);
@@ -1257,7 +1267,7 @@ async function initialize() {
     }
     const actionButton = event.target.closest('[data-action]');
     if (actionButton) {
-      perform(actionButton.dataset.action, actionButton.dataset.id);
+      perform(actionButton.dataset.action, actionButton.dataset.id, actionButton.dataset.memberId);
       return;
     }
     if (event.target.id === 'reload-data') {
