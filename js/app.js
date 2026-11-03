@@ -863,14 +863,17 @@ async function removeEmptyParent(entryId) {
 async function deleteEntry(id) {
   const current = state.entries.find(entry => entry.id === id);
   if (!current) throw new Error('This food item no longer exists.');
-  const result = await supabase.from('food_entry_items').delete().eq('id', id);
-  requireResult(result, 'Removing the food item');
+  const result = await supabase.from('food_entry_items').delete().eq('id', id).select('id').maybeSingle();
+  const deleted = requireResult(result, 'Removing the food item');
+  if (!deleted) {
+    throw new Error('Food item was not removed. Refresh the page and check that you are signed in as the owner.');
+  }
   await removeEmptyParent(current.entryId);
 }
 
-async function addMenuItem() {
-  const name = $('#new-menu-name')?.value.trim();
-  const price = parseMoney($('#new-menu-price')?.value);
+async function addMenuItem(nameInput, priceInput) {
+  const name = nameInput.trim();
+  const price = parseMoney(priceInput);
   if (!name || name.length > 120 || price === null) {
     throw new Error('Enter a menu item name and a valid price with up to 2 decimals.');
   }
@@ -1107,6 +1110,9 @@ async function perform(action, id, memberId) {
     }
     return;
   }
+  const menuItemInput = action === 'add-menu'
+    ? { name: $('#new-menu-name')?.value || '', price: $('#new-menu-price')?.value || '' }
+    : null;
   state.busy = true;
   state.notice = '';
   render();
@@ -1129,7 +1135,7 @@ async function perform(action, id, memberId) {
     } else if (action === 'cancel-edit') {
       state.editItemId = '';
       state.quantity = '';
-    } else if (action === 'add-menu') await addMenuItem();
+    } else if (action === 'add-menu') await addMenuItem(menuItemInput.name, menuItemInput.price);
     else if (action === 'toggle-menu') await toggleMenuItem(id);
     else if (action === 'delete-menu') notice = await deleteMenuItem(id) || '';
     else if (action === 'add-payment') await addPayment();
