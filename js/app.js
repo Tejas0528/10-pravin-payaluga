@@ -385,7 +385,7 @@ function renderMembers() {
 }
 
 function renderProfile() {
-  return `<div class="card"><h2>Profile</h2><p class="mu">${escapeHtml(state.user?.email || 'Signed in')}</p>
+  const profile = `<div class="card"><h2>Profile</h2><p class="mu">${escapeHtml(state.user?.email || 'Signed in')}</p>
     <h3>Change password</h3>
     <form id="change-password-form">
       <label>New password<input id="new-password" type="password" autocomplete="new-password" minlength="6" required></label>
@@ -395,6 +395,7 @@ function renderProfile() {
       <p id="password-status" class="notice ${state.passwordError ? 'error' : 'success'}" role="status" aria-live="polite">${escapeHtml(state.passwordMessage)}</p>
     </form>
   </div>`;
+  return profile + (state.isOwner ? renderAccessRequests() : '');
 }
 
 function renderAccessRequests() {
@@ -448,8 +449,7 @@ function render() {
     mem: renderMembers,
     profile: renderProfile
   };
-  const approvals = state.isOwner && state.tab === 'dash' ? renderAccessRequests() : '';
-  app.innerHTML = approvals + views[state.tab]();
+  app.innerHTML = views[state.tab]();
   app.classList.toggle('busy', state.busy);
   const signedIn = $('#signed-in-user');
   if (signedIn) signedIn.textContent = state.user.email || 'Signed in';
