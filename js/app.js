@@ -28,6 +28,14 @@ const state = {
   month: today().slice(0, 7),
   memberId: '',
   reportMemberId: '',
+  historyDate: today(),
+  historyMemberId: '',
+  historyMeal: '',
+  dailyEntries: [],
+  dailyLoadedDate: '',
+  dailyLoading: false,
+  dailyError: '',
+  dailyRequestId: 0,
   meal: 'Morning',
   menuItemId: '',
   quantity: '',
@@ -109,6 +117,10 @@ function databaseError(error) {
   if (error?.showSupabaseMessage) return message;
   if (error?.code === 'PGRST205') {
     return 'Access approval is not set up yet. The owner must run supabase/security.sql in the Supabase SQL Editor before anyone uses the app.';
+  }
+  if (error?.code === 'PGRST202' &&
+      /add_food_entry_item|update_food_entry_item|delete_food_entry_item|delete_food_entry/i.test(message)) {
+    return 'Food-entry database functions are not installed yet. Run supabase/food_entry_workflows.sql in the Supabase SQL Editor.';
   }
   if (error?.code === '42501' || /row-level security|permission denied/i.test(message)) {
     return `${message} Check the Supabase RLS policies for signed-in users.`;
@@ -194,6 +206,58 @@ async function loadData() {
   if (!activeItems.some(item => item.id === state.menuItemId)) {
     state.menuItemId = activeItems[0]?.id || '';
   }
+}
+
+async function loadDailyEntries(date) {
+  const requestId = ++state.dailyRequestId;
+  state.dailyLoadedDate = date;
+  state.dailyEntries = [];
+  state.dailyLoading = true;
+  state.dailyError = '';
+  updateDailyResults();
+  try {
+    const parentsResult = await supabase.from('food_entries')
+      .select('id,member_id,entry_date,meal')
+      .eq('entry_date', date)
+      .order('meal');
+    const parents = requireResult(parentsResult, 'Loading daily food entries');
+    if (requestId !== state.dailyRequestId) return;
+    if (!parents.length) return;
+
+    const parentById = new Map(parents.map(parent => [parent.id, parent]));
+    const itemsResult = await supabase.from('food_entry_items')
+      .select('id,entry_id,item_name,menu_item_id,quantity,unit_price_paise')
+      .in('entry_id', parents.map(parent => parent.id));
+    const items = requireResult(itemsResult, 'Loading daily food items');
+    if (requestId !== state.dailyRequestId) return;
+    state.dailyEntries = items.flatMap(item => {
+      const parent = parentById.get(item.entry_id);
+      if (!parent) return [];
+      return [{
+        id: item.id,
+        entryId: parent.id,
+        memberId: parent.member_id,
+        date: parent.entry_date,
+        meal: parent.meal,
+        itemName: item.item_name,
+        menuItemId: item.menu_item_id,
+        quantity: Number(item.quantity),
+        pricePaise: Number(item.unit_price_paise)
+      }];
+    });
+  } catch (error) {
+    if (requestId === state.dailyRequestId) state.dailyError = databaseError(error);
+  } finally {
+    if (requestId === state.dailyRequestId) {
+      state.dailyLoading = false;
+      updateDailyResults();
+    }
+  }
+}
+
+function updateDailyResults() {
+  const results = state.tab === 'daily' ? $('#daily-results') : null;
+  if (results) results.innerHTML = renderDailyResults();
 }
 
 function table(headers, rows, numericColumns = []) {
@@ -286,7 +350,7 @@ function renderEntry() {
     `<option value="${escapeHtml(item.id)}" ${item.id === state.menuItemId ? 'selected' : ''}>${escapeHtml(item.name)} – ${formatMoney(item.pricePaise)}</option>`
   ).join('');
   const currentRows = currentEntries.map(entry =>
-    `<tr><td>${escapeHtml(entryItemName(entry))}</td><td>${entry.quantity}</td><td class="n">${formatMoney(entry.pricePaise)}</td><td class="n">${formatMoney(entry.pricePaise * entry.quantity)}</td><td><button class="btn s sm" data-action="edit-entry" data-id="${escapeHtml(entry.id)}">Edit</button> <button class="btn d sm" data-action="delete-entry" data-id="${escapeHtml(entry.id)}">Remove</button></td></tr>`
+    `<tr><td>${escapeHtml(entryItemName(entry))}</td><td>${entry.quantity}</td><td class="n">${formatMoney(entry.pricePaise)}</td><td class="n">${formatMoney(entry.pricePaise * entry.quantity)}</td><td><button class="btn s sm" data-action="edit-entry" data-id="${escapeHtml(entry.id)}">Edit</button> <button class="btn d sm" data-action="delete-food-item" data-id="${escapeHtml(entry.id)}">Remove item</button></td></tr>`
   );
   if (currentEntries.length) {
     currentRows.push(`<tr class="t"><td colspan="3">${escapeHtml(state.meal)} total</td><td class="n">${formatMoney(sum(currentEntries))}</td><td></td></tr>`);
@@ -306,11 +370,73 @@ function renderEntry() {
       : '<p class="mu">Add at least one member and one active menu item in their tabs before recording food.</p>'}
       <span class="notice entry-message ${state.noticeType}" role="status">${escapeHtml(state.notice)}</span>
     </div>
-    <div class="card"><h2>${escapeHtml(memberName(state.memberId))} · ${escapeHtml(state.meal)} · ${escapeHtml(state.date)}</h2>${table(['Item', 'Qty', 'Unit price', 'Amount', ''], currentRows, [2, 3])}</div>`;
+    <div class="card"><h2>${escapeHtml(memberName(state.memberId))} · ${escapeHtml(state.meal)} · ${escapeHtml(state.date)}</h2>${table(['Item', 'Qty', 'Unit price', 'Amount', ''], currentRows, [2, 3])}</div>
+    ${renderEntryHistory()}`;
+}
+
+function renderEntryHistory() {
+  const memberOptions = [
+    '<option value="">All members</option>',
+    ...state.members.map(member =>
+      `<option value="${escapeHtml(member.id)}" ${member.id === state.historyMemberId ? 'selected' : ''}>${escapeHtml(member.name)}</option>`
+    )
+  ].join('');
+  const mealOptions = [
+    '<option value="">All meals</option>',
+    ...MEALS.map(meal =>
+      `<option value="${meal}" ${meal === state.historyMeal ? 'selected' : ''}>${meal}</option>`
+    )
+  ].join('');
+  const filtered = state.entries.filter(entry =>
+    (!state.historyDate || entry.date === state.historyDate) &&
+    (!state.historyMemberId || entry.memberId === state.historyMemberId) &&
+    (!state.historyMeal || entry.meal === state.historyMeal)
+  );
+  const groups = new Map();
+  filtered.forEach(entry => {
+    if (!groups.has(entry.entryId)) groups.set(entry.entryId, []);
+    groups.get(entry.entryId).push(entry);
+  });
+  const historyGroups = [...groups.values()].sort((a, b) =>
+    b[0].date.localeCompare(a[0].date) ||
+    a[0].memberId.localeCompare(b[0].memberId) ||
+    MEALS.indexOf(a[0].meal) - MEALS.indexOf(b[0].meal)
+  );
+  const content = historyGroups.length ? historyGroups.map(entries => {
+    const first = entries[0];
+    const rows = entries.map(entry =>
+      `<tr><td>${escapeHtml(entryItemName(entry))}</td><td class="n">${entry.quantity}</td><td class="n">${formatMoney(entry.pricePaise)}</td><td class="n">${formatMoney(entry.quantity * entry.pricePaise)}</td><td><button class="btn s sm" data-action="edit-entry" data-id="${escapeHtml(entry.id)}">Edit</button> <button class="btn d sm" data-action="delete-food-item" data-id="${escapeHtml(entry.id)}">Remove item</button></td></tr>`
+    );
+    rows.push(`<tr class="t"><td colspan="3">${escapeHtml(first.meal)} total</td><td class="n">${formatMoney(sum(entries))}</td><td></td></tr>`);
+    return `<section class="history-group">
+      <div class="row history-heading"><h3>${escapeHtml(first.date)} · ${escapeHtml(memberName(first.memberId))} · ${escapeHtml(first.meal)}</h3>
+        <button class="btn d sm" data-action="delete-food-entry" data-id="${escapeHtml(first.entryId)}">Delete meal entry</button>
+      </div>${table(['Food item', 'Qty', 'Unit price', 'Line total', ''], rows, [1, 2, 3])}
+    </section>`;
+  }).join('') : '<p class="empty">No food entries match these filters.</p>';
+  return `<div class="card"><h2>Entry history</h2><div class="tools history-filters">
+      <label>Date<input type="date" id="history-date" value="${escapeHtml(state.historyDate)}"></label>
+      <label>Member<select id="history-member">${memberOptions}</select></label>
+      <label>Meal<select id="history-meal">${mealOptions}</select></label>
+    </div><div class="history-groups">${content}</div></div>`;
 }
 
 function renderDaily() {
-  const entries = state.entries.filter(entry => entry.date === state.date);
+  const dateInput = `<div class="card"><div class="row"><label style="max-width:220px">Date<input id="daily-date" type="date" value="${escapeHtml(state.date)}"></label></div></div>`;
+  return `${dateInput}<div id="daily-results">${renderDailyResults()}</div>`;
+}
+
+function renderDailyResults() {
+  if (state.dailyLoading || state.dailyLoadedDate !== state.date) {
+    return `<div class="card"><p class="notice info" role="status">Loading entries for ${escapeHtml(state.date)}…</p></div>`;
+  }
+  if (state.dailyError) {
+    return `<div class="card"><p class="notice error" role="alert">${escapeHtml(state.dailyError)}</p></div>`;
+  }
+  const entries = state.dailyEntries.filter(entry => entry.date === state.date);
+  if (!entries.length) {
+    return `<div class="card"><h2>Daily totals · ${escapeHtml(state.date)}</h2><p class="empty">No food entries for this date.</p></div>`;
+  }
   if (!state.isOwner) {
     const member = state.members[0];
     if (!member) return '<div class="card"><p class="notice error">Your member assignment could not be loaded.</p></div>';
@@ -319,9 +445,8 @@ function renderDaily() {
       `<tr><td>${meal}</td><td class="n">${formatMoney(sum(ownEntries.filter(entry => entry.meal === meal)))}</td></tr>`
     );
     mealRows.push(`<tr class="t"><td>Your day total</td><td class="n">${formatMoney(sum(ownEntries))}</td></tr>`);
-    return `<div class="card"><div class="row"><label style="max-width:220px">Date<input id="daily-date" type="date" value="${escapeHtml(state.date)}"></label></div></div>
-      <div class="card"><h2>${escapeHtml(member.name)}’s orders · ${escapeHtml(state.date)}</h2>${table(['Meal', 'Your total'], mealRows, [1])}
-      ${table(['Food item', 'Meal', 'Qty', 'Amount'], ownEntries.map(entry => `<tr><td>${escapeHtml(entryItemName(entry))}</td><td>${escapeHtml(entry.meal)}</td><td>${entry.quantity}</td><td class="n">${formatMoney(entry.pricePaise * entry.quantity)}</td></tr>`), [3])}</div>`;
+    return `<div class="card"><h2>${escapeHtml(member.name)}’s orders · ${escapeHtml(state.date)}</h2>${table(['Meal', 'Your total'], mealRows, [1])}
+      ${table(['Food item', 'Meal', 'Qty', 'Unit price', 'Line total'], ownEntries.map(entry => `<tr><td>${escapeHtml(entryItemName(entry))}</td><td>${escapeHtml(entry.meal)}</td><td>${entry.quantity}</td><td class="n">${formatMoney(entry.pricePaise)}</td><td class="n">${formatMoney(entry.pricePaise * entry.quantity)}</td></tr>`), [3, 4])}</div>`;
   }
   const rows = state.members.map(member => {
     const personEntries = entries.filter(entry => entry.memberId === member.id);
@@ -334,8 +459,11 @@ function renderDaily() {
     `<td class="n">${formatMoney(sum(entries.filter(entry => entry.meal === meal)))}</td>`
   ).join('');
   rows.push(`<tr class="t"><td>Room total</td>${mealTotals}<td class="n">${formatMoney(sum(entries))}</td></tr>`);
-  return `<div class="card"><div class="row"><label style="max-width:220px">Date<input id="daily-date" type="date" value="${escapeHtml(state.date)}"></label></div></div>
-    <div class="card"><h2>Daily totals</h2>${table(['Member', ...MEALS, 'Day total'], rows, [1, 2, 3, 4])}</div>`;
+  const itemRows = entries.map(entry =>
+    `<tr><td>${escapeHtml(memberName(entry.memberId))}</td><td>${escapeHtml(entry.meal)}</td><td>${escapeHtml(entryItemName(entry))}</td><td class="n">${entry.quantity}</td><td class="n">${formatMoney(entry.pricePaise)}</td><td class="n">${formatMoney(entry.quantity * entry.pricePaise)}</td></tr>`
+  );
+  return `<div class="card"><h2>Daily totals · ${escapeHtml(state.date)}</h2>${table(['Member', ...MEALS, 'Day total'], rows, [1, 2, 3, 4])}</div>
+    <div class="card"><h2>Food item details</h2>${table(['Member', 'Meal', 'Item', 'Qty', 'Unit price', 'Line total'], itemRows, [3, 4, 5])}</div>`;
 }
 
 function renderMonth() {
@@ -627,6 +755,11 @@ async function showApp(user) {
     state.members = [];
     state.menu = [];
     state.entries = [];
+    state.dailyEntries = [];
+    state.dailyLoadedDate = '';
+    state.dailyLoading = false;
+    state.dailyError = '';
+    state.dailyRequestId += 1;
     state.payments = [];
     state.notice = '';
     return;
@@ -639,6 +772,11 @@ async function showApp(user) {
   state.accessStatus = 'checking';
   if (userChanged) {
     state.tab = 'dash';
+    state.dailyEntries = [];
+    state.dailyLoadedDate = '';
+    state.dailyLoading = false;
+    state.dailyError = '';
+    state.dailyRequestId += 1;
     state.passwordMessage = '';
     state.passwordError = false;
   }
@@ -738,58 +876,16 @@ async function createEntry() {
   }
   const menuItem = selectedMenuItem(state.menuItemId);
   if (!menuItem || !menuItem.active) throw new Error('Select an active menu item.');
-  let entryId;
-  const existingResult = await supabase.from('food_entries')
-    .select('id')
-    .eq('member_id', state.memberId)
-    .eq('entry_date', state.date)
-    .eq('meal', state.meal)
-    .limit(1)
-    .maybeSingle();
-  const existing = requireResult(existingResult, 'Checking the food entry');
-  if (existing) {
-    entryId = existing.id;
-  } else {
-    const parentResult = await supabase.from('food_entries').insert({
-      member_id: state.memberId,
-      entry_date: state.date,
-      meal: state.meal
-    }).select('id').single();
-    entryId = requireResult(parentResult, 'Creating the food entry').id;
-  }
-  const findMatchingItem = () => supabase.from('food_entry_items').select('id')
-    .eq('entry_id', entryId)
-    .eq('item_name', menuItem.name)
-    .eq('menu_item_id', menuItem.id)
-    .eq('quantity', quantity)
-    .eq('unit_price_paise', menuItem.pricePaise)
-    .limit(1)
-    .maybeSingle();
-  const existingItemResult = await findMatchingItem();
-  const existingItem = requireResult(existingItemResult, 'Checking for an existing food item');
-  if (existingItem) {
-    state.quantity = '';
-    return 'This identical food item is already recorded; no duplicate was added.';
-  }
-  const itemResult = await supabase.from('food_entry_items').insert({
-    entry_id: entryId,
-    item_name: menuItem.name,
-    menu_item_id: menuItem.id,
-    quantity,
-    unit_price_paise: menuItem.pricePaise
+  const result = await supabase.rpc('add_food_entry_item', {
+    p_member_id: state.memberId,
+    p_entry_date: state.date,
+    p_meal: state.meal,
+    p_menu_item_id: menuItem.id,
+    p_quantity: quantity
   });
-  if (itemResult.error) {
-    const verificationResult = await findMatchingItem();
-    if (verificationResult.error) {
-      throw new Error(`Adding the food item: ${itemResult.error.message}. Could not verify whether it was saved: ${verificationResult.error.message}`);
-    }
-    if (verificationResult.data) {
-      state.quantity = '';
-      return 'Food item was saved despite a network response issue; no duplicate was added.';
-    }
-    throw new Error(`Adding the food item: ${itemResult.error.message}`);
-  }
+  const saved = requireResult(result, 'Adding the food item');
   state.quantity = '';
+  if (!saved.inserted) return 'This identical food item is already recorded; no duplicate was added.';
 }
 
 async function saveEntry() {
@@ -804,71 +900,36 @@ async function saveEntry() {
   if (!menuItem || (!menuItem.active && menuItem.id !== current.menuItemId)) {
     throw new Error('Select an active menu item.');
   }
-  const oldParent = current.entryId;
-  const parentChanged = current.memberId !== state.memberId ||
-    current.date !== state.date || current.meal !== state.meal;
-  let targetParent = oldParent;
-  let createdParent = false;
-  if (parentChanged) {
-    const targetResult = await supabase.from('food_entries').select('id')
-      .eq('member_id', state.memberId)
-      .eq('entry_date', state.date)
-      .eq('meal', state.meal)
-      .limit(1)
-      .maybeSingle();
-    const target = requireResult(targetResult, 'Checking the destination food entry');
-    if (target) {
-      targetParent = target.id;
-    } else {
-      const createResult = await supabase.from('food_entries').insert({
-        member_id: state.memberId,
-        entry_date: state.date,
-        meal: state.meal
-      }).select('id').single();
-      targetParent = requireResult(createResult, 'Creating the destination food entry').id;
-      createdParent = true;
-    }
-  }
-  const pricePaise = menuItem.id === current.menuItemId
-    ? current.pricePaise : menuItem.pricePaise;
-  const updateResult = await supabase.from('food_entry_items').update({
-    entry_id: targetParent,
-    item_name: menuItem.id === current.menuItemId ? entryItemName(current) : menuItem.name,
-    menu_item_id: menuItem.id,
-    quantity,
-    unit_price_paise: pricePaise
-  }).eq('id', current.id);
-  if (updateResult.error) {
-    let cleanupError = '';
-    if (createdParent) {
-      const cleanup = await supabase.from('food_entries').delete().eq('id', targetParent);
-      if (cleanup.error) cleanupError = ` The empty entry could not be removed: ${cleanup.error.message}`;
-    }
-    throw new Error(`Updating the food item: ${updateResult.error.message}.${cleanupError}`);
-  }
-  if (parentChanged) await removeEmptyParent(oldParent);
+  const result = await supabase.rpc('update_food_entry_item', {
+    p_item_id: current.id,
+    p_member_id: state.memberId,
+    p_entry_date: state.date,
+    p_meal: state.meal,
+    p_menu_item_id: menuItem.id,
+    p_quantity: quantity
+  });
+  requireResult(result, 'Updating the food item');
   state.editItemId = '';
   state.quantity = '';
 }
 
-async function removeEmptyParent(entryId) {
-  const childrenResult = await supabase.from('food_entry_items').select('id').eq('entry_id', entryId).limit(1);
-  const children = requireResult(childrenResult, 'Checking food entry items');
-  if (!children.length) {
-    const deleteResult = await supabase.from('food_entries').delete().eq('id', entryId);
-    requireResult(deleteResult, 'Removing an empty food entry');
-  }
-}
-
-async function deleteEntry(id) {
+async function deleteFoodEntryItem(id) {
   const current = state.entries.find(entry => entry.id === id);
   if (!current) throw new Error('This food item no longer exists.');
-  const result = await supabase.from('food_entry_items').delete().eq('id', id).select('id').maybeSingle();
+  const result = await supabase.rpc('delete_food_entry_item', { p_item_id: id });
   const deleted = requireResult(result, 'Removing the food item');
   if (!deleted) {
     throw new Error('Food item was not removed. Refresh the page and check that you are signed in as the owner.');
   }
-  await removeEmptyParent(current.entryId);
+}
+
+async function deleteFoodEntry(entryId) {
+  if (!state.entries.some(entry => entry.entryId === entryId)) {
+    throw new Error('This meal entry no longer exists. Refresh and try again.');
+  }
+  const result = await supabase.rpc('delete_food_entry', { p_entry_id: entryId });
+  const deleted = requireResult(result, 'Removing the meal entry');
+  if (!deleted) throw new Error('Meal entry was not removed. Refresh and try again.');
 }
 
 async function addMenuItem(nameInput, priceInput) {
@@ -876,6 +937,9 @@ async function addMenuItem(nameInput, priceInput) {
   const price = parseMoney(priceInput);
   if (!name || name.length > 120 || price === null) {
     throw new Error('Enter a menu item name and a valid price with up to 2 decimals.');
+  }
+  if (state.menu.some(item => item.name.trim().toLowerCase() === name.toLowerCase())) {
+    throw new Error('A menu item with this name already exists.');
   }
   const result = await supabase.from('menu_items').insert({
     name,
@@ -893,6 +957,11 @@ async function saveMenuField(input) {
   if (input.dataset.menuName) {
     const name = input.value.trim();
     if (!name || name.length > 120) throw new Error('Menu item names must be 1–120 characters.');
+    if (state.menu.some(menuItem =>
+      menuItem.id !== id && menuItem.name.trim().toLowerCase() === name.toLowerCase()
+    )) {
+      throw new Error('A menu item with this name already exists.');
+    }
     changes.name = name;
   } else {
     const price = parseMoney(input.value);
@@ -1089,7 +1158,7 @@ function downloadReport(format) {
 async function perform(action, id, memberId) {
   if (state.busy) return;
   const ownerActions = new Set([
-    'add-entry', 'save-entry', 'delete-entry', 'edit-entry', 'add-menu',
+    'add-entry', 'save-entry', 'delete-food-item', 'delete-food-entry', 'edit-entry', 'add-menu',
     'toggle-menu', 'delete-menu',
     'add-payment', 'delete-payment', 'approve-request', 'reject-request'
   ]);
@@ -1120,9 +1189,12 @@ async function perform(action, id, memberId) {
     let notice = '';
     if (action === 'add-entry') notice = await createEntry() || '';
     else if (action === 'save-entry') await saveEntry();
-    else if (action === 'delete-entry') {
+    else if (action === 'delete-food-item') {
       if (!window.confirm('Remove this food item?')) return;
-      await deleteEntry(id);
+      await deleteFoodEntryItem(id);
+    } else if (action === 'delete-food-entry') {
+      if (!window.confirm('Delete this meal entry and all of its food items? This cannot be undone.')) return;
+      await deleteFoodEntry(id);
     } else if (action === 'edit-entry') {
       const entry = state.entries.find(item => item.id === id);
       if (!entry) throw new Error('This food item no longer exists.');
@@ -1158,7 +1230,8 @@ async function perform(action, id, memberId) {
     state.notice = notice || ({
       'add-entry': 'Food entry added successfully.',
       'save-entry': 'Food entry updated.',
-      'delete-entry': 'Food item removed.',
+      'delete-food-item': 'Food item removed.',
+      'delete-food-entry': 'Meal entry and its food items deleted.',
       'add-menu': 'Menu item added.',
       'toggle-menu': 'Menu item status updated.',
       'add-payment': 'Payment added.',
@@ -1167,6 +1240,9 @@ async function perform(action, id, memberId) {
       'reject-request': 'Access request rejected.'
     }[action] || '');
     state.noticeType = 'success';
+    if (state.tab === 'daily' && ['add-entry', 'save-entry', 'delete-food-item', 'delete-food-entry'].includes(action)) {
+      await loadDailyEntries(state.date);
+    }
   } catch (error) {
     state.notice = databaseError(error);
     state.noticeType = 'error';
@@ -1202,6 +1278,15 @@ async function handleChange(event) {
       updateQuantityPreview();
     } else if (element.id === 'daily-date') {
       state.date = element.value || today();
+      await loadDailyEntries(state.date);
+    } else if (element.id === 'history-date') {
+      state.historyDate = element.value;
+    } else if (element.id === 'history-member') {
+      state.historyMemberId = element.value;
+      render();
+    } else if (element.id === 'history-meal') {
+      state.historyMeal = element.value;
+      render();
     } else if (element.id === 'report-month') {
       if (element.value) state.month = element.value;
       render();
@@ -1281,6 +1366,7 @@ async function initialize() {
     state.tab = button.dataset.tab;
     state.notice = '';
     render();
+    if (state.tab === 'daily') loadDailyEntries(state.date);
   });
   $('#app').addEventListener('click', event => {
     const mealButton = event.target.closest('[data-meal]');
@@ -1317,8 +1403,13 @@ async function initialize() {
   });
   $('#app').addEventListener('focusout', event => {
     const element = event.target;
-    if (element.id !== 'entry-date' && element.id !== 'daily-date') return;
-    state.date = element.value || (element.id === 'daily-date' ? today() : '');
+    if (element.id === 'entry-date') {
+      state.date = element.value;
+    } else if (element.id === 'history-date') {
+      state.historyDate = element.value;
+    } else {
+      return;
+    }
     window.setTimeout(() => {
       if (!state.busy) render();
     }, 0);

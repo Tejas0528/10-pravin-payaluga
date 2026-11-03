@@ -70,6 +70,11 @@ td.n,th.n{text-align:right}tr.t td{font-weight:700}
 .report-actions .btn{width:auto}
 .empty{color:var(--mu);text-align:center;padding:18px}
 .entry-card .entry-message{min-height:1.5em}
+.history-filters{margin-bottom:14px}
+.history-group{padding-top:14px;margin-top:14px;border-top:1px solid var(--bd)}
+.history-heading{justify-content:space-between;margin-bottom:8px}
+.history-heading h3{margin:0;font-size:15px}
+.history-groups>.empty{margin:0}
 .busy{opacity:.65;pointer-events:none}
 [hidden]{display:none!important}
 @media(max-width:600px){.auth-shell{margin:5vh 12px;padding:22px}.account-bar{margin-left:0}}
