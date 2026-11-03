@@ -1,8 +1,7 @@
 -- 10 Pravin Payaluga access control.
 -- Run in Supabase SQL Editor as the project owner before publishing the app.
 -- The five existing business tables are reused; no duplicate business tables are created.
--- Replace the all-zero owner UUID below with your Supabase Auth user ID.
--- Use the same UUID as OWNER_USER_ID in js/supabase.js before applying this file.
+-- Owner status is derived from the authenticated user's trusted auth.users email.
 
 create table if not exists public.member_access_requests (
   user_id uuid primary key references auth.users(id) on delete cascade,
@@ -29,7 +28,12 @@ stable
 security definer
 set search_path = pg_catalog, public
 as $$
-  select auth.uid() = '00000000-0000-0000-0000-000000000000'::uuid;
+  select exists (
+    select 1
+    from auth.users as room_user
+    where room_user.id = auth.uid()
+      and lower(room_user.email) = 'ktejaskuppusamy@gmail.com'
+  );
 $$;
 
 create or replace function public.current_room_member_id()

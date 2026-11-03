@@ -1,4 +1,4 @@
-import { OWNER_USER_ID, supabase } from './supabase.js';
+import { supabase } from './supabase.js';
 
 const MEALS = ['Morning', 'Afternoon', 'Night'];
 const TABS = [
@@ -482,7 +482,7 @@ async function showApp(user) {
   if (sessionLoad && sessionLoadUserId === user.id) return sessionLoad;
   const generation = ++authGeneration;
   state.user = user;
-  state.isOwner = user.id === OWNER_USER_ID && OWNER_USER_ID !== '00000000-0000-0000-0000-000000000000';
+  state.isOwner = false;
   state.accessStatus = 'checking';
   $('#auth-screen').hidden = true;
   $('#app-shell').hidden = false;
@@ -491,6 +491,10 @@ async function showApp(user) {
   sessionLoadUserId = user.id;
   sessionLoad = (async () => {
     try {
+      state.isOwner = requireResult(
+        await supabase.rpc('is_room_admin'),
+        'Checking owner privileges'
+      ) === true;
       if (!state.isOwner) {
         const requestResult = await supabase.from('member_access_requests')
           .select('user_id,email,status,member_id,requested_at')
@@ -557,7 +561,10 @@ async function authenticate(event) {
     return;
   }
   if (state.authMode === 'sign-up' && !result.data.session) {
-    setAuthStatus('Account created. Check your email to confirm it, then sign in.');
+    setAuthStatus(
+      'Supabase created the account without an active session. Disable email confirmation in the Supabase Email provider settings, then sign in.',
+      true
+    );
   } else {
     setAuthStatus('Signed in successfully.');
   }

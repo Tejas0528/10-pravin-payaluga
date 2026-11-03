@@ -7,8 +7,6 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
   throw new Error('Missing Supabase environment variables. Copy .env.example to .env and fill in the project URL and publishable key.');
 }
 
-export const OWNER_USER_ID = '00000000-0000-0000-0000-000000000000';
-
 export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     autoRefreshToken: true,
