@@ -7,7 +7,8 @@ const TABS = [
   ['daily', 'Daily'],
   ['month', 'Monthly & Payments'],
   ['menu', 'Menu'],
-  ['mem', 'Members']
+  ['mem', 'Members'],
+  ['profile', 'Profile']
 ];
 
 function today() {
@@ -31,12 +32,17 @@ const state = {
   quantity: '',
   editItemId: '',
   authMode: 'sign-in',
+  recoveryMode: new URLSearchParams(window.location.hash.slice(1)).get('type') === 'recovery',
+  recoveryComplete: false,
+  passwordMessage: '',
+  passwordError: false,
   members: [],
   menu: [],
   entries: [],
   payments: [],
   notice: '',
   noticeType: 'info',
+  accessMessage: '',
   busy: false
 };
 let sessionLoad = null;
@@ -376,6 +382,19 @@ function renderMembers() {
   return `<div class="card"><h2>Member profiles</h2><p class="mu">Rename the six existing members here. Member slots cannot be added or deleted, so approved accounts stay linked to these members.</p><span class="notice ${state.noticeType}" role="status">${escapeHtml(state.notice)}</span>${table(['Member'], rows)}</div>`;
 }
 
+function renderProfile() {
+  return `<div class="card"><h2>Profile</h2><p class="mu">${escapeHtml(state.user?.email || 'Signed in')}</p>
+    <h3>Change password</h3>
+    <form id="change-password-form">
+      <label>New password<input id="new-password" type="password" autocomplete="new-password" minlength="6" required></label>
+      <label>Confirm new password<input id="confirm-password" type="password" autocomplete="new-password" minlength="6" required></label>
+      <p class="mu">Use at least 6 characters. Supabase will enforce any additional password rules configured for this project.</p>
+      <button class="btn" type="submit">Update password</button>
+      <p id="password-status" class="notice ${state.passwordError ? 'error' : 'success'}" role="status" aria-live="polite">${escapeHtml(state.passwordMessage)}</p>
+    </form>
+  </div>`;
+}
+
 function renderAccessRequests() {
   const reviewable = state.accessRequests.filter(request => request.status !== 'approved');
   const approvedByOthers = new Set(state.accessRequests
@@ -403,10 +422,15 @@ function render() {
   const nav = $('#nav');
   const app = $('#app');
   if (!nav || !app || !state.user) return;
+  if (!state.isOwner && state.accessStatus !== 'approved') {
+    renderAccessGate(state.accessMessage, state.accessStatus);
+    return;
+  }
   const tabs = state.isOwner ? TABS : [
     ['dash', 'My Expenses'],
     ['daily', 'My Orders'],
-    ['month', 'Monthly Summary']
+    ['month', 'Monthly Summary'],
+    ['profile', 'Profile']
   ];
   if (!tabs.some(([key]) => key === state.tab)) state.tab = 'dash';
   nav.innerHTML = tabs.map(([key, label]) =>
@@ -418,7 +442,8 @@ function render() {
     daily: renderDaily,
     month: renderMonth,
     menu: renderMenu,
-    mem: renderMembers
+    mem: renderMembers,
+    profile: renderProfile
   };
   const approvals = state.isOwner && state.tab === 'dash' ? renderAccessRequests() : '';
   app.innerHTML = approvals + views[state.tab]();
@@ -435,9 +460,15 @@ function renderAccessGate(message, status) {
     : status === 'rejected'
       ? 'The owner did not approve this account. Contact the owner if you believe this is a mistake.'
       : message || 'The owner needs to configure database access before the app can be used.';
-  $('#nav').innerHTML = '';
+  state.accessMessage = message;
+  const tabs = [['access', 'Access status'], ['profile', 'Profile']];
+  if (!tabs.some(([key]) => key === state.tab)) state.tab = 'access';
+  $('#nav').innerHTML = tabs.map(([key, label]) =>
+    `<button class="${state.tab === key ? 'on' : ''}" data-tab="${key}" aria-current="${state.tab === key ? 'page' : 'false'}">${label}</button>`
+  ).join('');
   const canRetry = status === 'error' || status === 'pending' || status === 'rejected';
-  $('#app').innerHTML = `<section class="card access-gate"><h2>${title}</h2><p>${escapeHtml(detail)}</p>${canRetry ? `<button class="btn" data-action="retry-access">${status === 'error' ? 'Retry' : 'Check approval status'}</button>` : ''}<span class="notice ${status === 'error' ? 'error' : 'info'}" role="status">${status === 'error' ? escapeHtml(message) : ''}</span></section>`;
+  const accessCard = `<section class="card access-gate"><h2>${title}</h2><p>${escapeHtml(detail)}</p>${canRetry ? `<button class="btn" data-action="retry-access">${status === 'error' ? 'Retry' : 'Check approval status'}</button>` : ''}<span class="notice ${status === 'error' ? 'error' : 'info'}" role="status">${status === 'error' ? escapeHtml(message) : ''}</span></section>`;
+  $('#app').innerHTML = state.tab === 'profile' ? renderProfile() : accessCard;
 }
 
 function setAuthStatus(message, isError = false) {
@@ -457,10 +488,118 @@ function renderAuthMode() {
   $('#auth-submit').textContent = signUp ? 'Create account' : 'Sign in';
   $('#auth-mode').textContent = signUp ? 'Back to sign in' : 'Create an account';
   $('#auth-password').autocomplete = signUp ? 'new-password' : 'current-password';
+  $('#forgot-password').hidden = signUp;
+}
+
+function setRecoveryStatus(message, isError = false) {
+  const status = $('#recovery-status');
+  if (status) {
+    status.textContent = message;
+    status.style.color = isError ? 'var(--er)' : 'var(--ok)';
+  }
+}
+
+function renderPasswordRecovery(user) {
+  $('#auth-screen').hidden = true;
+  $('#app-shell').hidden = true;
+  $('#password-recovery-screen').hidden = false;
+  $('#password-recovery-form').hidden = !user || state.recoveryComplete;
+  $('#recovery-continue').hidden = !state.recoveryComplete;
+  $('#recovery-cancel').hidden = state.recoveryComplete;
+  if (!user) {
+    setRecoveryStatus('This password recovery link is invalid or expired. Request a new one from the sign-in page.', true);
+  } else if (state.recoveryComplete) {
+    setRecoveryStatus('Password updated successfully. Your session is still active.', false);
+  } else if (state.passwordMessage) {
+    setRecoveryStatus(state.passwordMessage, state.passwordError);
+  } else {
+    setRecoveryStatus('Enter and confirm your new password.', false);
+  }
+}
+
+function clearRecoveryUrl() {
+  window.history.replaceState(null, document.title, `${window.location.pathname}${window.location.search}`);
+}
+
+async function requestPasswordReset() {
+  const emailInput = $('#auth-email');
+  if (!emailInput.value.trim()) {
+    emailInput.reportValidity();
+    return;
+  }
+  if (!emailInput.checkValidity()) {
+    emailInput.reportValidity();
+    return;
+  }
+  const { error } = await supabase.auth.resetPasswordForEmail(emailInput.value.trim(), {
+    redirectTo: window.location.href.split('#')[0]
+  });
+  if (error) {
+    setAuthStatus(error.message, true);
+    return;
+  }
+  setAuthStatus('If an account exists for that email, Supabase will send a password recovery link.');
+}
+
+async function saveNewPassword(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const isRecovery = form.id === 'password-recovery-form';
+  const newPassword = $(`#${isRecovery ? 'recovery-new-password' : 'new-password'}`).value;
+  const confirmation = $(`#${isRecovery ? 'recovery-confirm-password' : 'confirm-password'}`).value;
+  const setMessage = (message, isError) => {
+    state.passwordMessage = message;
+    state.passwordError = isError;
+    if (isRecovery) renderPasswordRecovery(state.user);
+    else {
+      const status = $('#password-status');
+      status.textContent = message;
+      status.className = `notice ${isError ? 'error' : 'success'}`;
+    }
+  };
+  if (newPassword.length < 6) {
+    setMessage('Password must be at least 6 characters. Supabase may enforce additional password rules.', true);
+    return;
+  }
+  if (newPassword !== confirmation) {
+    setMessage('The passwords do not match.', true);
+    return;
+  }
+  const submitButton = form.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  try {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+    form.reset();
+    setMessage('Password updated successfully. Your session is still active.', false);
+    if (isRecovery) {
+      state.recoveryComplete = true;
+      renderPasswordRecovery(state.user);
+    }
+  } catch (error) {
+    console.error(error);
+    setMessage(databaseError(error), true);
+  } finally {
+    submitButton.disabled = false;
+  }
+}
+
+function continueAfterRecovery() {
+  state.recoveryMode = false;
+  state.recoveryComplete = false;
+  state.passwordMessage = '';
+  state.passwordError = false;
+  clearRecoveryUrl();
+  showApp(state.user);
 }
 
 let authGeneration = 0;
 async function showApp(user) {
+  if (state.recoveryMode) {
+    state.user = user;
+    renderPasswordRecovery(user);
+    return;
+  }
   if (!user) {
     authGeneration += 1;
     sessionLoad = null;
@@ -470,7 +609,10 @@ async function showApp(user) {
     state.accessStatus = 'signed-out';
     state.accessRequest = null;
     state.accessRequests = [];
+    state.passwordMessage = '';
+    state.passwordError = false;
     $('#auth-screen').hidden = false;
+    $('#password-recovery-screen').hidden = true;
     $('#app-shell').hidden = true;
     state.members = [];
     state.menu = [];
@@ -480,11 +622,18 @@ async function showApp(user) {
     return;
   }
   if (sessionLoad && sessionLoadUserId === user.id) return sessionLoad;
+  const userChanged = state.user?.id !== user.id;
   const generation = ++authGeneration;
   state.user = user;
   state.isOwner = false;
   state.accessStatus = 'checking';
+  if (userChanged) {
+    state.tab = 'dash';
+    state.passwordMessage = '';
+    state.passwordError = false;
+  }
   $('#auth-screen').hidden = true;
+  $('#password-recovery-screen').hidden = true;
   $('#app-shell').hidden = false;
   $('#signed-in-user').textContent = user.email || 'Signed in';
   renderAccessGate('Checking account approval…', 'checking');
@@ -1060,6 +1209,17 @@ async function initialize() {
     setAuthStatus('');
     renderAuthMode();
   });
+  $('#forgot-password').addEventListener('click', () => {
+    requestPasswordReset().catch(error => {
+      console.error(error);
+      setAuthStatus(databaseError(error), true);
+    });
+  });
+  $('#password-recovery-form').addEventListener('submit', event => {
+    saveNewPassword(event);
+  });
+  $('#recovery-continue').addEventListener('click', continueAfterRecovery);
+  $('#recovery-cancel').addEventListener('click', continueAfterRecovery);
   $('#google-signin').addEventListener('click', async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
@@ -1104,6 +1264,11 @@ async function initialize() {
       showApp(state.user);
     }
   });
+  $('#app').addEventListener('submit', event => {
+    if (event.target.id === 'change-password-form') {
+      saveNewPassword(event);
+    }
+  });
   $('#app').addEventListener('input', event => {
     if (event.target.id === 'entry-quantity') {
       state.quantity = event.target.value;
@@ -1116,11 +1281,24 @@ async function initialize() {
       showNotice(databaseError(error), 'error');
     });
   });
-  supabase.auth.onAuthStateChange((_event, session) => {
-    window.setTimeout(() => showApp(session?.user || null), 0);
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      state.recoveryMode = true;
+      state.recoveryComplete = false;
+      state.passwordMessage = '';
+      state.passwordError = false;
+    }
+    window.setTimeout(() => {
+      if (state.recoveryMode) renderPasswordRecovery(session?.user || state.user);
+      else showApp(session?.user || null);
+    }, 0);
   });
   const { data, error } = await supabase.auth.getSession();
   if (error) throw error;
+  if (state.recoveryMode) {
+    renderPasswordRecovery(data.session?.user || null);
+    return;
+  }
   await showApp(data.session?.user || null);
 }
 

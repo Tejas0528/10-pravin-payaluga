@@ -23,8 +23,22 @@
       <button class="btn s" id="auth-mode" type="button">Create an account</button>
       <button class="btn s" id="google-signin" type="button">Continue with Google</button>
     </div>
+    <button class="btn s" id="forgot-password" type="button">Forgot password?</button>
     <p class="mu">Accounts are created immediately. The owner must approve and assign each account to an existing member before expenses are visible.</p>
     <p id="auth-status" class="auth-status" role="status" aria-live="polite"></p>
+  </section>
+
+  <section id="password-recovery-screen" class="card auth-shell" aria-labelledby="recovery-title" hidden>
+    <h1 id="recovery-title">Reset your password</h1>
+    <p>Choose a new password for your RoomBite account.</p>
+    <form id="password-recovery-form">
+      <label>New password<input id="recovery-new-password" type="password" autocomplete="new-password" minlength="6" required></label>
+      <label>Confirm new password<input id="recovery-confirm-password" type="password" autocomplete="new-password" minlength="6" required></label>
+      <button class="btn" type="submit">Save new password</button>
+    </form>
+    <p id="recovery-status" class="auth-status" role="status" aria-live="polite"></p>
+    <button class="btn s" id="recovery-continue" type="button" hidden>Continue to RoomBite</button>
+    <button class="btn s" id="recovery-cancel" type="button">Back</button>
   </section>
 
   <div id="app-shell" hidden>
