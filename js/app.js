@@ -543,7 +543,7 @@ async function requestPasswordReset() {
 
 async function saveNewPassword(event) {
   event.preventDefault();
-  const form = event.currentTarget;
+  const form = event.target;
   const isRecovery = form.id === 'password-recovery-form';
   const newPassword = $(`#${isRecovery ? 'recovery-new-password' : 'new-password'}`).value;
   const confirmation = $(`#${isRecovery ? 'recovery-confirm-password' : 'confirm-password'}`).value;
@@ -571,7 +571,7 @@ async function saveNewPassword(event) {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) throw error;
     form.reset();
-    setMessage('Password updated successfully. Your session is still active.', false);
+    setMessage('Password updated successfully', false);
     if (isRecovery) {
       state.recoveryComplete = true;
       renderPasswordRecovery(state.user);
